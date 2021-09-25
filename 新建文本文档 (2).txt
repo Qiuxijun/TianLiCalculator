@@ -1,0 +1,2086 @@
+'********************************************************
+'**
+'** @ BL2CK Software Co.Ltd All Rights Reserved
+'**
+'********************************************************
+Option Explicit
+
+'请在 工程 - 部件 - 中选择 BSkin.ocx
+
+'系统API———————————————————————————————————————————————
+Private Declare Function GetWindowLong Lib "User32" Alias "GetWindowLongA" (ByVal hWnd As Long, ByVal nIndex As Long) As Long '窗体无边框
+Private Declare Function SetWindowLong Lib "User32" Alias "SetWindowLongA" (ByVal hWnd As Long, ByVal nIndex As Long, ByVal dwNewLong As Long) As Long
+
+Private Const GWL_STYLE = (-16)
+Private Const WS_CAPTION = &HC00000
+
+'计算数据———————————————————————————————————————————————
+Private Declare Function StrFormatByteSize Lib "shlwapi" Alias "StrFormatByteSizeA" (ByVal dw As Long, ByVal pszBuf As String, ByRef cchBuf As Long) As String '计算数据
+
+'动态效果———————————————————————————————————————————————
+Dim mObj1 As Object '线程一
+Dim mToTop1 As Single, mToLeft1 As Single '如果一次点击移动两个控件，则再写一个线程
+
+'窗体阴影———————————————————————————————————————————————
+Private FormShadow As clsShadow
+
+'系统菜单———————————————————————————————————————————————
+Public Enum CMenuTypeEnum
+    MenuString = 0
+    MenuSeparate = 1
+    CheckBox = 2
+End Enum
+
+Private Const WM_TASKMENU As Long = &H313
+Private Const WM_SYSCOMMAND As Long = &H112
+
+Private WithEvents C_Menu As clsCMenu
+Private WithEvents C_Sort As clsCMenu
+Private WithEvents c_Subclass As clsCSubclass
+
+'取色模块———————————————————————————————————————————————
+Dim Red As Long
+Dim Green As Long
+Dim Blue As Long
+Dim sRed As Long
+Dim sGreen As Long
+Dim sBlue As Long
+Dim Color As Long
+
+Private MODEL_TRAY As Boolean '是否显示托盘气泡（避免托盘模式下每次关闭窗体都会弹出气泡）
+Dim LevelText(1 To 96) As String, SetCount As Integer, BoxTemp(0 To 3) As Integer
+Dim CurrChar As Integer
+
+
+
+Private Sub AlphaImageChar_Click(ByVal Button As Integer)
+Unload FrmChar
+FrmChar.Show
+
+End Sub
+
+'Public SET_TRAY As String
+
+Private Sub AlphaImageChar_MouseEnter()
+AlphaImageChar.FadeInOut 40, 8
+End Sub
+Private Sub AlphaImageChar_MouseExit()
+AlphaImageChar.FadeInOut 100, 8
+End Sub
+
+Private Sub AlphaImageWeap_Click(ByVal Button As Integer)
+'Unload FrmChar
+FrmChar.Show
+FrmChar.ShowWeapon Val(CharList(Val(AlphaImageChar.Tag), 2))
+End Sub
+
+Private Sub AlphaImageWeap_MouseEnter()
+AlphaImageWeap.FadeInOut 40, 8
+End Sub
+Private Sub AlphaImageWeap_MouseExit()
+AlphaImageWeap.FadeInOut 100, 8
+End Sub
+
+
+Private Sub ArtShowImage_Click(Index As Integer, ByVal Button As Integer)
+Dim i As Integer, j As Integer
+i = Val(Picture2.Tag)
+j = Val(Container4.Tag)
+If j = 0 Then Exit Sub
+    If i = 1 Then
+        SetPic1(j).LoadImage_FromFile App.Path + "\Res\Public\" + ArtList(Val(ArtShowImage(Index).Tag), 1) + ".png"
+        SetPic1(j).Tag = ArtShowImage(Index).Tag
+    End If
+    If i = 2 Then
+        SetPic2(j).LoadImage_FromFile App.Path + "\Res\Public\" + ArtList(Val(ArtShowImage(Index).Tag), 1) + ".png"
+        SetPic2(j).Tag = ArtShowImage(Index).Tag
+    End If
+    If i = 3 Then
+        SetPic3(j).LoadImage_FromFile App.Path + "\Res\Public\" + ArtList(Val(ArtShowImage(Index).Tag), 1) + ".png"
+        SetPic3(j).Tag = ArtShowImage(Index).Tag
+    End If
+    If i = 4 Then
+        SetPic4(j).LoadImage_FromFile App.Path + "\Res\Public\" + ArtList(Val(ArtShowImage(Index).Tag), 1) + ".png"
+        SetPic4(j).Tag = ArtShowImage(Index).Tag
+    End If
+    If i = 5 Then
+        SetPic5(j).LoadImage_FromFile App.Path + "\Res\Public\" + ArtList(Val(ArtShowImage(Index).Tag), 1) + ".png"
+        SetPic5(j).Tag = ArtShowImage(Index).Tag
+    End If
+    Container4.Visible = False
+    Container4.Tag = 0
+    Frame2.Caption = "圣遗物方案"
+    Picture2.Visible = False
+End Sub
+
+Private Sub ArtShowImage_MouseEnter(Index As Integer)
+ShowBox.Top = ArtShowImage(Index).Top + ArtShowImage(Index).Height + 200
+ShowBox.Left = ArtShowImage(Index).Left + 700 + IIf(ArtShowImage(Index).Left = 8280, -2000, 0)
+LoadArtShowBox Val(ArtShowImage(Index).Tag)
+ShowBox.Visible = True
+End Sub
+Private Sub ArtShowImage_MouseExit(Index As Integer)
+ShowBox.Visible = False
+End Sub
+
+
+Private Sub LoadArtShowBox(Index As Integer)
+Dim s As String, v As Variant, v2 As Variant, i As Integer
+If Index <= 0 Then Exit Sub
+v = Array("生之花", "死之羽", "时之沙", "空之杯", "理之冠")
+v2 = Array("染血的骑士道", "被怜爱的少女", "苍白之火", "炽烈的炎之魔女", "翠绿之影", "渡过烈火的贤人", "流浪大地的乐团", "逆飞的流星", "平息鸣雷的尊者", "千岩牢固", "冰风迷途的勇士", "沉沦之心", "绝缘之旗印", "角斗士的终幕礼", "追忆之注连", "如雷的盛怒", "悠古的磐岩", "昔日宗室之仪")
+s = ArtList(Index, 1)
+ShowBoxLabel(5).Caption = v2(Val(Mid(s, 2, InStr(1, s, "_") - 2)) - 1) + "-" + v(Val(Mid(s, InStr(1, s, "_") + 1, 1)) - 1)
+For i = 0 To 4
+    ShowBoxLabel(i).Caption = ""
+    s = ArtList(Index, i * 2 + 2)
+    If Right(s, 1) = "%" Then
+        ShowBoxLabel(i).Caption = "%"
+        s = Mid(s, 1, Len(s) - 1)
+    End If
+    ShowBoxLabel(i).Caption = s + "+" + ArtList(Index, i * 2 + 3) + ShowBoxLabel(i).Caption
+Next
+End Sub
+
+
+
+Private Sub BuffComboBox1_SelectionMade(ByVal SelectedItem As String, ByVal SelectedItemIndex As Long)
+Dim t As String, i%
+t = Enemy(BuffComboBox1.ListIndex + 1, 11)
+BuffComboBox2.Clear
+    If t <> "" Then
+        For i = 1 To Len(t)
+            BuffComboBox2.AddItem Mid(t, i, 1)
+        Next
+    Else
+        BuffComboBox2.AddItem "无"
+    End If
+    BuffComboBox2.ListIndex = 1
+    LoadBuff 1
+End Sub
+
+Private Sub BuffComboBox2_SelectionMade(ByVal SelectedItem As String, ByVal SelectedItemIndex As Long)
+    LoadBuff 1
+End Sub
+
+Private Sub CBox_Click(Index As Integer)
+Dim i%
+ If CBox(Index).Value = Checked Then
+    CBoxFlag = Index
+ Else
+    CBoxFlag = Index - 1
+ End If
+ 
+ For i = 0 To 5
+    If i <= CBoxFlag Then
+        CBox(i).Value = Checked
+    Else
+        CBox(i).Value = Unchecked
+    End If
+ Next
+ SaveSet0
+ ReloadTip = True
+End Sub
+
+
+
+
+
+
+Private Sub CommandButton1_Click()
+SetCount = SetCount + 1
+Load SetBox(SetCount)
+SetBox(SetCount).Left = SetBox(0).Left
+SetBox(SetCount).Top = (SetCount - 1) * 2280 + 600
+SetBox(SetCount).Visible = True
+
+Load SetLabel(SetCount)
+Set SetLabel(SetCount).Container = SetBox(SetCount)
+SetLabel(SetCount).Left = SetLabel(0).Left
+SetLabel(SetCount).Top = SetLabel(0).Top
+SetLabel(SetCount).Visible = True
+SetLabel(SetCount).Caption = "方案" + CStr(SetCount)
+
+Load SetCopyButton(SetCount)
+Set SetCopyButton(SetCount).Container = SetBox(SetCount)
+SetCopyButton(SetCount).Left = SetCopyButton(0).Left
+SetCopyButton(SetCount).Top = SetCopyButton(0).Top
+SetCopyButton(SetCount).Visible = True
+
+
+Load SetTipLabel(SetCount)
+Set SetTipLabel(SetCount).Container = SetBox(SetCount)
+SetTipLabel(SetCount).Left = SetTipLabel(0).Left
+SetTipLabel(SetCount).Top = SetTipLabel(0).Top
+SetTipLabel(SetCount).Visible = True
+
+Load SetSwitch(SetCount)
+Set SetSwitch(SetCount).Container = SetBox(SetCount)
+SetSwitch(SetCount).Left = SetSwitch(0).Left
+SetSwitch(SetCount).Top = SetSwitch(0).Top
+SetSwitch(SetCount).Visible = True
+
+Load SetPic1(SetCount)
+Set SetPic1(SetCount).Container = SetBox(SetCount)
+SetPic1(SetCount).Left = SetPic1(0).Left
+SetPic1(SetCount).Top = SetPic1(0).Top
+SetPic1(SetCount).Visible = True
+SetPic1(SetCount).LoadImage_FromStdPicture ImageTemp(0).Picture
+Load SetPic2(SetCount)
+Set SetPic2(SetCount).Container = SetBox(SetCount)
+SetPic2(SetCount).Left = SetPic2(0).Left
+SetPic2(SetCount).Top = SetPic2(0).Top
+SetPic2(SetCount).Visible = True
+SetPic2(SetCount).LoadImage_FromStdPicture ImageTemp(0).Picture
+Load SetPic3(SetCount)
+Set SetPic3(SetCount).Container = SetBox(SetCount)
+SetPic3(SetCount).Left = SetPic3(0).Left
+SetPic3(SetCount).Top = SetPic3(0).Top
+SetPic3(SetCount).Visible = True
+SetPic3(SetCount).LoadImage_FromStdPicture ImageTemp(0).Picture
+Load SetPic4(SetCount)
+Set SetPic4(SetCount).Container = SetBox(SetCount)
+SetPic4(SetCount).Left = SetPic4(0).Left
+SetPic4(SetCount).Top = SetPic4(0).Top
+SetPic4(SetCount).Visible = True
+SetPic4(SetCount).LoadImage_FromStdPicture ImageTemp(0).Picture
+Load SetPic5(SetCount)
+Set SetPic5(SetCount).Container = SetBox(SetCount)
+SetPic5(SetCount).Left = SetPic5(0).Left
+SetPic5(SetCount).Top = SetPic5(0).Top
+SetPic5(SetCount).Visible = True
+SetPic5(SetCount).LoadImage_FromStdPicture ImageTemp(0).Picture
+Load SetBox2(SetCount)
+Set SetBox2(SetCount).Container = SetBox(SetCount)
+SetBox2(SetCount).Left = SetBox2(0).Left
+SetBox2(SetCount).Top = SetBox2(0).Top
+SetBox2(SetCount).Visible = False
+
+Load SetTipLabel2(SetCount)
+Set SetTipLabel2(SetCount).Container = SetBox2(SetCount)
+SetTipLabel2(SetCount).Left = SetTipLabel2(0).Left
+SetTipLabel2(SetCount).Top = SetTipLabel2(0).Top
+SetTipLabel2(SetCount).Visible = True
+
+Load SetTipLabel3(SetCount)
+Set SetTipLabel3(SetCount).Container = SetBox2(SetCount)
+SetTipLabel3(SetCount).Left = SetTipLabel3(0).Left
+SetTipLabel3(SetCount).Top = SetTipLabel3(0).Top
+SetTipLabel3(SetCount).Visible = True
+
+Load SetTipLabel4(SetCount)
+Set SetTipLabel4(SetCount).Container = SetBox2(SetCount)
+SetTipLabel4(SetCount).Left = SetTipLabel4(0).Left
+SetTipLabel4(SetCount).Top = SetTipLabel4(0).Top
+SetTipLabel4(SetCount).Visible = True
+
+Load SetTipLabel5(SetCount)
+Set SetTipLabel5(SetCount).Container = SetBox2(SetCount)
+SetTipLabel5(SetCount).Left = SetTipLabel5(0).Left
+SetTipLabel5(SetCount).Top = SetTipLabel5(0).Top
+SetTipLabel5(SetCount).Visible = True
+
+Load SetTipLabel6(SetCount)
+Set SetTipLabel6(SetCount).Container = SetBox2(SetCount)
+SetTipLabel6(SetCount).Left = SetTipLabel6(0).Left
+SetTipLabel6(SetCount).Top = SetTipLabel6(0).Top
+SetTipLabel6(SetCount).Visible = True
+
+Load SetTipLabel7(SetCount)
+Set SetTipLabel7(SetCount).Container = SetBox2(SetCount)
+SetTipLabel7(SetCount).Left = SetTipLabel7(0).Left
+SetTipLabel7(SetCount).Top = SetTipLabel7(0).Top
+SetTipLabel7(SetCount).Visible = True
+
+Load SetTipLabel8(SetCount)
+Set SetTipLabel8(SetCount).Container = SetBox2(SetCount)
+SetTipLabel8(SetCount).Left = SetTipLabel8(0).Left
+SetTipLabel8(SetCount).Top = SetTipLabel8(0).Top
+SetTipLabel8(SetCount).Visible = True
+
+Load SetTipLabel9(SetCount)
+Set SetTipLabel9(SetCount).Container = SetBox2(SetCount)
+SetTipLabel9(SetCount).Left = SetTipLabel9(0).Left
+SetTipLabel9(SetCount).Top = SetTipLabel9(0).Top
+SetTipLabel9(SetCount).Visible = True
+
+Load SetTipLabel10(SetCount)
+Set SetTipLabel10(SetCount).Container = SetBox2(SetCount)
+SetTipLabel10(SetCount).Left = SetTipLabel10(0).Left
+SetTipLabel10(SetCount).Top = SetTipLabel10(0).Top
+SetTipLabel10(SetCount).Visible = True
+
+Load SetTipLabel11(SetCount)
+Set SetTipLabel11(SetCount).Container = SetBox2(SetCount)
+SetTipLabel11(SetCount).Left = SetTipLabel11(0).Left
+SetTipLabel11(SetCount).Top = SetTipLabel11(0).Top
+SetTipLabel11(SetCount).Visible = True
+
+Load SetTipLabel12(SetCount)
+Set SetTipLabel12(SetCount).Container = SetBox(SetCount)
+SetTipLabel12(SetCount).Left = SetTipLabel12(0).Left
+SetTipLabel12(SetCount).Top = SetTipLabel12(0).Top
+SetTipLabel12(SetCount).Visible = False
+Load SetTipLabel13(SetCount)
+Set SetTipLabel13(SetCount).Container = SetBox(SetCount)
+SetTipLabel13(SetCount).Left = SetTipLabel13(0).Left
+SetTipLabel13(SetCount).Top = SetTipLabel13(0).Top
+SetTipLabel13(SetCount).Visible = False
+
+Load SetCombo1(SetCount)
+Set SetCombo1(SetCount).Container = SetBox2(SetCount)
+SetCombo1(SetCount).Left = SetCombo1(0).Left
+SetCombo1(SetCount).Top = SetCombo1(0).Top
+SetCombo1(SetCount).Visible = True
+
+Load SetCombo2(SetCount)
+Set SetCombo2(SetCount).Container = SetBox2(SetCount)
+SetCombo2(SetCount).Left = SetCombo2(0).Left
+SetCombo2(SetCount).Top = SetCombo2(0).Top
+SetCombo2(SetCount).Visible = True
+
+Load SetCombo3(SetCount)
+Set SetCombo3(SetCount).Container = SetBox2(SetCount)
+SetCombo3(SetCount).Left = SetCombo3(0).Left
+SetCombo3(SetCount).Top = SetCombo3(0).Top
+SetCombo3(SetCount).Visible = True
+
+Load SetText1(SetCount)
+Set SetText1(SetCount).Container = SetBox2(SetCount)
+SetText1(SetCount).Left = SetText1(0).Left
+SetText1(SetCount).Top = SetText1(0).Top
+SetText1(SetCount).Visible = True
+
+Load SetText2(SetCount)
+Set SetText2(SetCount).Container = SetBox2(SetCount)
+SetText2(SetCount).Left = SetText2(0).Left
+SetText2(SetCount).Top = SetText2(0).Top
+SetText2(SetCount).Visible = True
+
+Load SetText3(SetCount)
+Set SetText3(SetCount).Container = SetBox2(SetCount)
+SetText3(SetCount).Left = SetText3(0).Left
+SetText3(SetCount).Top = SetText3(0).Top
+SetText3(SetCount).Visible = True
+
+Load SetText4(SetCount)
+Set SetText4(SetCount).Container = SetBox2(SetCount)
+SetText4(SetCount).Left = SetText4(0).Left
+SetText4(SetCount).Top = SetText4(0).Top
+SetText4(SetCount).Visible = True
+
+Load SetText5(SetCount)
+Set SetText5(SetCount).Container = SetBox2(SetCount)
+SetText5(SetCount).Left = SetText5(0).Left
+SetText5(SetCount).Top = SetText5(0).Top
+SetText5(SetCount).Visible = True
+
+Load SetText6(SetCount)
+Set SetText6(SetCount).Container = SetBox2(SetCount)
+SetText6(SetCount).Left = SetText6(0).Left
+SetText6(SetCount).Top = SetText6(0).Top
+SetText6(SetCount).Visible = True
+
+Load SetText7(SetCount)
+Set SetText7(SetCount).Container = SetBox2(SetCount)
+SetText7(SetCount).Left = SetText7(0).Left
+SetText7(SetCount).Top = SetText7(0).Top
+SetText7(SetCount).Visible = True
+    SetCombo1(SetCount).AddItem "攻击力%"
+    SetCombo1(SetCount).AddItem "生命值%"
+    SetCombo1(SetCount).AddItem "防御力%"
+    SetCombo1(SetCount).AddItem "元素精通"
+    SetCombo1(SetCount).AddItem "充能效率"
+    SetCombo2(SetCount).AddItem "攻击力%"
+    SetCombo2(SetCount).AddItem "生命值%"
+    SetCombo2(SetCount).AddItem "防御力%"
+    SetCombo2(SetCount).AddItem "元素精通"
+    SetCombo2(SetCount).AddItem "火属性伤害加成"
+    SetCombo2(SetCount).AddItem "水属性伤害加成"
+    SetCombo2(SetCount).AddItem "草属性伤害加成"
+    SetCombo2(SetCount).AddItem "雷属性伤害加成"
+    SetCombo2(SetCount).AddItem "风属性伤害加成"
+    SetCombo2(SetCount).AddItem "冰属性伤害加成"
+    SetCombo2(SetCount).AddItem "岩属性伤害加成"
+    SetCombo2(SetCount).AddItem "物理伤害加成"
+    SetCombo3(SetCount).AddItem "攻击力%"
+    SetCombo3(SetCount).AddItem "生命值%"
+    SetCombo3(SetCount).AddItem "防御力%"
+    SetCombo3(SetCount).AddItem "元素精通"
+    SetCombo3(SetCount).AddItem "暴击率"
+    SetCombo3(SetCount).AddItem "暴击伤害"
+    SetCombo3(SetCount).AddItem "治疗加成"
+    SetCombo1(SetCount).ListIndex = 1
+    SetCombo2(SetCount).ListIndex = 1
+    SetCombo3(SetCount).ListIndex = 1
+    
+If SetCount > 2 Then
+    ScrollBar1.Visible = True
+    Frame2.Height = 5100 / 2 * SetCount
+    ScrollBar1.Max = Frame2.Height - Container2.Height
+End If
+End Sub
+
+
+Private Sub CommandButton2_Click()
+If Container4.Visible = False Then
+
+    Call ShowArtBoxC
+End If
+End Sub
+
+Sub ShowArtBoxC()
+Dim i%, j%, k%, t%
+    On Error Resume Next
+        For i = 1 To 1000
+            Unload ArtShowImage(i)
+        Next
+
+        i = UBound(ArtList)
+            For j = 1 To i
+                Load ArtShowImage(j)
+                ArtShowImage(j).LoadImage_FromFile App.Path + "\Res\Public\" + ArtList(j, 1) + ".png"
+                k = j Mod 7
+                If k = 0 Then k = 7
+                t = Int((j - 1) / 7)
+                ArtShowImage(j).Left = 360 + (k - 1) * 1320
+                ArtShowImage(j).Top = 240 + t * 1320
+                ArtShowImage(j).Visible = True
+                ArtShowImage(j).Tag = j
+                
+            Next
+    Container4.Visible = True
+    Container4.Tag = 0
+    Frame2.Caption = "圣遗物库存"
+    Picture2.Visible = True
+End Sub
+
+Sub UpdateArtList()
+Dim i%, j%, k%
+Dim s As String, temp() As String, t() As String
+
+        s = Dir(App.Path + "\Data\Artifact\*.*")
+        j = 0
+        Do While s <> ""
+          j = j + 1
+          ReDim Preserve t(1 To j)
+                Open App.Path + "\Data\Artifact\" + s For Binary As #1
+                   t(j) = StrConv(InputB(LOF(1), 1), vbUnicode)
+                 Close #1
+            s = Dir()
+        Loop
+        ReDim ArtList(1 To j, 1 To 11)
+        
+        For i = 1 To j
+                 temp = Split(t(i), vbCrLf)
+                    For k = 0 To 10
+                         ArtList(i, k + 1) = temp(k)
+                    Next
+        Next
+End Sub
+
+
+ Sub ShowArtBoxA(Atype As Integer, Index As Integer)
+Dim i%, j%, v As Variant, n As Integer, k%, t%
+v = Array("生之花", "死之羽", "时之沙", "空之杯", "理之冠")
+n = 0
+    On Error Resume Next
+        For i = 1 To 1000
+            Unload ArtShowImage(i)
+        Next
+    i = UBound(ArtList)
+            For j = 1 To i
+                If Val(Mid(ArtList(j, 1), InStr(1, ArtList(j, 1), "_") + 1, 1)) = Atype Then
+                    n = n + 1
+                    Load ArtShowImage(n)
+                    ArtShowImage(n).LoadImage_FromFile App.Path + "\Res\Public\" + ArtList(j, 1) + ".png"
+                    k = n Mod 7
+                    If k = 0 Then k = 7
+                    t = Int((n - 1) / 7)
+                    ArtShowImage(n).Left = 360 + (k - 1) * 1320
+                    ArtShowImage(n).Top = 240 + t * 1320
+                    ArtShowImage(n).Visible = True
+                    ArtShowImage(n).Tag = j
+                    If CStr(j) = SetPic1(Index).Tag Or CStr(j) = SetPic2(Index).Tag Or CStr(j) = SetPic3(Index).Tag Or CStr(j) = SetPic4(Index).Tag Or CStr(j) = SetPic5(Index).Tag Then ArtShowImage(n).Opacity = 30
+                End If
+            Next
+            Container4.Visible = True
+            Picture2.Visible = True
+            Picture2.Tag = Atype
+            Container4.Tag = Index
+            Frame2.Caption = "选择圣遗物：" + v(Atype - 1)
+End Sub
+
+
+
+
+Private Sub CommandButton3_Click()
+Container3.Visible = False
+SetTipLabel13(Val(CommandButton3.Tag)) = ""
+
+If Label1(2).Visible Then
+    SetTipLabel13(Val(CommandButton3.Tag)) = Left(SetSelectBox(0).Text, 2) + "4"
+Else
+    If SetSelectBox(0).Text <> "无" Then SetTipLabel13(Val(CommandButton3.Tag)) = SetTipLabel13(Val(CommandButton3.Tag)) + SetSelectBox(0).Text + vbCrLf
+    If SetSelectBox(1).Text <> "无" Then SetTipLabel13(Val(CommandButton3.Tag)) = SetTipLabel13(Val(CommandButton3.Tag)) + SetSelectBox(1).Text
+End If
+End Sub
+
+
+Private Sub CommandButton4_Click()
+If Container4.Visible = True Then
+    Container4.Visible = False
+    Frame2.Caption = "圣遗物方案"
+    Picture2.Visible = False
+End If
+End Sub
+
+Private Sub CommandButton5_MouseDown(Button As Integer, Shift As Integer, x As Single, y As Single)
+FrmAbout.Show
+End Sub
+
+Private Sub CommandButton6_MouseDown(Button As Integer, Shift As Integer, x As Single, y As Single)
+            test.cNumber = Val(AlphaImageChar.Tag)
+            test.cWeapon = Val(AlphaImageWeap.Tag)
+    
+            
+            CreatChar test, FrmMain.lblTab(4).Tag '初始化角色
+            
+            AddArt test, 1 '加上圣遗物加成
+            AddBuffListBonus test '加上buff列表的加成
+            SolveBonus test '加上武器特效
+            SolveCharBonus test '加上角色特效
+            
+            Call Calc(test, Label2(2).Caption, Val(Label2(3).Tag), Val(Label2(5).Tag), Val(Text1(17).Text), 1)
+            Call pngTab_Click(4, 1)
+End Sub
+
+Private Sub Form_Load()
+On Error Resume Next
+    '自动注册控件（Win7一般会自动注册，但是Win8.1或Win10控件不注册，直接运行就会出错）
+    Dim objTemp As Object
+    Set objTemp = CreateObject("BSkin.Container") '判断创建引用是否成功
+    If Err.Number <> 0 Then '如果创建报错
+        UniOCX "BSkin.ocx" '先取消注册
+        RegOCX "BSkin.ocx" '再重新注册
+    End If '控件自动注册完毕（同样原理可以注册其他控件）
+    
+    '加载RGBA通道图标（任务栏图标不失真）
+    SetFormRGBAIcon Me, 0
+    SetWindowIcon Me.hWnd
+    
+    
+    '窗体阴影（阴影模式需要放在无边框效果之前）
+    If FormShadow Is Nothing Then Set FormShadow = New clsShadow
+    With FormShadow
+        .Depth = 3.5
+        .Color = vbBlack
+        .Transparency = 100
+        .Shadow Me
+    End With
+    
+    '无边窗效果（设置了菜单编辑器，所以 None 模式窗体会多出来边框）
+    Dim lStyle As Long
+    lStyle = GetWindowLong(Me.hWnd, GWL_STYLE)
+    lStyle = Not (WS_CAPTION) And lStyle
+    SetWindowLong Me.hWnd, GWL_STYLE, lStyle
+    
+    'MODEL_TRAY = True '托盘模式（用于只显示一次托盘气泡）
+    
+    'Call LoadCMenu '加载菜单
+
+    Call LoadControl '加载控件代码
+    LoadChar (2) '应该是上次加载剩下的
+    ReloadTip = True
+End Sub
+
+Private Sub Form_Unload(Cancel As Integer) '程序关闭时，一般用于释放资源或清理操作
+On Error Resume Next
+    Set C_Menu = Nothing
+    Set C_Sort = Nothing
+    Set c_Subclass = Nothing
+    xlapp.Quit '关闭excel
+    Set xlsheet = Nothing
+    Set xlbook = Nothing '从内存中清除
+    Set xlbook2 = Nothing '从内存中清除
+    Set xlapp = Nothing '从内存中清除
+    End
+End Sub
+
+Sub zMove1(zObject As Object, ToLeft As Single, ToTop As Single, Enable As Boolean) '动态效果 线程一（匀减速移动算法）
+On Error Resume Next
+    zTimCtn1.Enabled = False
+    Set mObj1 = Nothing
+    mToTop1 = 0: mToLeft1 = 0
+    If ToLeft = 0 Then ToLeft = 1
+    If ToTop = 0 Then ToTop = 1
+    
+    If Enable = False Then
+        Exit Sub
+    ElseIf Enable = True Then
+        Set mObj1 = zObject
+        mToTop1 = ToTop: mToLeft1 = ToLeft
+        zTimCtn1.Enabled = True
+    End If
+End Sub
+
+Private Sub Label2_Click(Index As Integer)
+'frmBuff.Show
+
+End Sub
+
+Private Sub LevelBar_MouseDown(Button As Integer, Shift As Integer, x As Single, y As Single)
+LevelBar.Tag = "1"
+End Sub
+Private Sub LevelBar_MouseMove(Button As Integer, Shift As Integer, x As Single, y As Single)
+If LevelBar.Tag = "1" Then
+LevelBar.Cls
+LevelBar.Line (0, 0)-(x, LevelBar.Height), , BF
+If x > 192 Then x = 192
+If x < 2 Then x = 2
+lblTab(4).Caption = "角色等级：" + LevelText(Int(x / 2))
+lblTab(4).Tag = Int(x / 2)
+End If
+End Sub
+Private Sub LevelBar_MouseUp(Button As Integer, Shift As Integer, x As Single, y As Single)
+LevelBar.Tag = "0"
+SaveSet0
+End Sub
+
+Private Sub LevelBox_SelectionMade(Index As Integer, ByVal SelectedItem As String, ByVal SelectedItemIndex As Long)
+Call LoadSkill
+SaveSet0
+End Sub
+
+
+
+
+Private Sub ListBox1_Selected(Index As Long)
+Dim i As Integer
+Label2(1) = "当前技能：" + CurrCharSkill(Index, 3)
+Label2(2).Caption = DMGTypetext(Val(CurrCharSkill(Index, 19)))
+CurrSkill = ListBox1.ItemKey(ListBox1.ListIndex)
+If (InStr(2, CurrSkill, "a") > 0 Or InStr(2, CurrSkill, "c") > 0 Or InStr(2, CurrSkill, "d") > 0) And test.附魔 <> "" Then Label2(2).Caption = test.附魔
+
+
+Select Case Label2(2).Caption
+    Case "物理"
+        Label2(2).ForeColor = vbBlack
+    Case "火"
+        Label2(2).ForeColor = vbRed
+    Case "水"
+         Label2(2).ForeColor = RGB(0, 128, 255)
+    Case "冰"
+         Label2(2).ForeColor = RGB(153, 217, 234)
+    Case "雷"
+        Label2(2).ForeColor = RGB(128, 0, 128)
+    Case "风"
+        Label2(2).ForeColor = vbGreen
+    Case "岩"
+        Label2(2).ForeColor = RGB(128, 64, 0)
+    Case "草"
+        Label2(2).ForeColor = RGB(128, 64, 0)
+End Select
+Label2(2).Left = Label2(1).Left + Label2(1).Width + 400
+
+    LoadBuff (0)
+
+
+ReloadTip = True
+SaveSet0
+End Sub
+
+
+Private Sub SelectBuffBar_MouseDown(Index As Integer, Button As Integer, Shift As Integer, x As Single, y As Single)
+SelectBuffBar(Index).Tag = "1"
+End Sub
+Private Sub SelectBuffBar_MouseMove(Index As Integer, Button As Integer, Shift As Integer, x As Single, y As Single)
+Dim i As Integer, j As Integer
+If SelectBuffBar(Index).Tag = "1" Then
+SelectBuffBar(Index).Cls
+
+j = Int(SelectBuffBar(Index).ScaleWidth / SelectBuffBar(Index).LinkTimeout) + 1
+i = Round(x / j)
+
+If i < 0 Then i = 0
+If i > SelectBuffBar(Index).LinkTimeout Then i = SelectBuffBar(Index).LinkTimeout
+
+
+SelectBuffBar(Index).Line (0, 0)-(i * j, SelectBuffBar(Index).Height), , BF
+BuffLabel(Index).Tag = i
+BuffLabel(Index).Caption = CStr(i) + "/" + CStr(SelectBuffBar(Index).LinkTimeout) + " " + SelectBuffLabel(SelectCount).Tag
+
+End If
+End Sub
+Private Sub SelectBuffBar_MouseUp(Index As Integer, Button As Integer, Shift As Integer, x As Single, y As Single)
+SelectBuffBar(Index).Tag = "0"
+End Sub
+
+Private Sub RBox_Click(Index As Integer)
+Dim i%
+ If RBox(Index).Value = Checked Then
+    RBoxFlag = Index
+ Else
+    RBoxFlag = Index - 1
+ End If
+ 
+ For i = 1 To 4
+    If i <= RBoxFlag Then
+        RBox(i).Value = Checked
+    Else
+        RBox(i).Value = Unchecked
+    End If
+ Next
+ SaveSet0
+End Sub
+
+Private Sub ScrollBar1_Scroll()
+Frame2.Top = -ScrollBar1.Value
+End Sub
+
+Private Sub ScrollBar2_Scroll()
+ContainerBox.Top = -ScrollBar2.Value
+End Sub
+
+Private Sub SetCopyButton_MouseDown(Index As Integer, Button As Integer, Shift As Integer, x As Single, y As Single)
+Call CommandButton1_Click
+SetSwitch(SetCount).Value = SetSwitch(Index).Value
+Call SetSwitch_Click(SetCount, SetSwitch(Index).Value)
+
+
+SetPic1(SetCount).Tag = SetPic1(Index).Tag
+If Val(SetPic1(SetCount).Tag) <> 0 Then
+SetPic1(SetCount).LoadImage_FromFile App.Path + "\Res\Public\" + ArtList(Val(SetPic1(Index).Tag), 1) + ".png"
+Else
+SetPic1(SetCount).LoadImage_FromFile ImageTemp(0).Picture
+End If
+SetPic2(SetCount).Tag = SetPic2(Index).Tag
+If Val(SetPic2(SetCount).Tag) <> 0 Then
+SetPic2(SetCount).LoadImage_FromFile App.Path + "\Res\Public\" + ArtList(Val(SetPic2(Index).Tag), 1) + ".png"
+Else
+SetPic2(SetCount).LoadImage_FromFile ImageTemp(0).Picture
+End If
+SetPic3(SetCount).Tag = SetPic3(Index).Tag
+If Val(SetPic3(SetCount).Tag) <> 0 Then
+SetPic3(SetCount).LoadImage_FromFile App.Path + "\Res\Public\" + ArtList(Val(SetPic3(Index).Tag), 1) + ".png"
+Else
+SetPic3(SetCount).LoadImage_FromFile ImageTemp(0).Picture
+End If
+SetPic4(SetCount).Tag = SetPic4(Index).Tag
+If Val(SetPic4(SetCount).Tag) <> 0 Then
+SetPic4(SetCount).LoadImage_FromFile App.Path + "\Res\Public\" + ArtList(Val(SetPic4(Index).Tag), 1) + ".png"
+Else
+SetPic4(SetCount).LoadImage_FromFile ImageTemp(0).Picture
+End If
+SetPic5(SetCount).Tag = SetPic5(Index).Tag
+If Val(SetPic5(SetCount).Tag) <> 0 Then
+SetPic5(SetCount).LoadImage_FromFile App.Path + "\Res\Public\" + ArtList(Val(SetPic5(Index).Tag), 1) + ".png"
+Else
+SetPic5(SetCount).LoadImage_FromFile ImageTemp(0).Picture
+End If
+
+SetCombo1(SetCount).ListIndex = SetCombo1(Index).ListIndex
+SetCombo2(SetCount).ListIndex = SetCombo2(Index).ListIndex
+SetCombo3(SetCount).ListIndex = SetCombo3(Index).ListIndex
+
+SetTipLabel13(SetCount) = SetTipLabel13(Index)
+SetText1(SetCount) = SetText1(Index)
+SetText2(SetCount) = SetText2(Index)
+SetText3(SetCount) = SetText3(Index)
+SetText4(SetCount) = SetText4(Index)
+SetText5(SetCount) = SetText5(Index)
+SetText6(SetCount) = SetText6(Index)
+SetText7(SetCount) = SetText7(Index)
+
+End Sub
+
+Private Sub SetPic5_Click(Index As Integer, ByVal Button As Integer)
+If Button = 1 Then ShowArtBoxA 5, Index
+If Button = 2 Then SetPic5(Index).LoadImage_FromStdPicture ImageTemp(0): SetPic5(Index).Tag = 0
+End Sub
+Private Sub SetPic4_Click(Index As Integer, ByVal Button As Integer)
+If Button = 1 Then ShowArtBoxA 4, Index
+If Button = 2 Then SetPic4(Index).LoadImage_FromStdPicture ImageTemp(0): SetPic4(Index).Tag = 0
+End Sub
+Private Sub SetPic3_Click(Index As Integer, ByVal Button As Integer)
+If Button = 1 Then ShowArtBoxA 3, Index
+If Button = 2 Then SetPic3(Index).LoadImage_FromStdPicture ImageTemp(0): SetPic3(Index).Tag = 0
+End Sub
+Private Sub SetPic2_Click(Index As Integer, ByVal Button As Integer)
+If Button = 1 Then ShowArtBoxA 2, Index
+If Button = 2 Then SetPic2(Index).LoadImage_FromStdPicture ImageTemp(0): SetPic2(Index).Tag = 0
+End Sub
+Private Sub SetPic1_Click(Index As Integer, ByVal Button As Integer)
+If Button = 1 Then ShowArtBoxA 1, Index
+If Button = 2 Then SetPic1(Index).LoadImage_FromStdPicture ImageTemp(0): SetPic1(Index).Tag = 0
+End Sub
+Private Sub SetPic5_MouseEnter(Index As Integer)
+If Val(SetPic5(Index).Tag) = 0 Then Exit Sub
+ShowBox.Top = SetBox(Index).Top + SetBox(Index).Height - 210 + IIf(Index > 1, -3250, 0)
+ShowBox.Left = SetPic5(Index).Left + 120
+LoadArtShowBox Val(SetPic5(Index).Tag)
+ShowBox.Visible = True
+End Sub
+Private Sub SetPic5_MouseExit(Index As Integer)
+ShowBox.Visible = False
+End Sub
+Private Sub SetPic4_MouseEnter(Index As Integer)
+If Val(SetPic4(Index).Tag) = 0 Then Exit Sub
+ShowBox.Top = SetBox(Index).Top + SetBox(Index).Height - 210 + IIf(Index > 1, -3250, 0)
+ShowBox.Left = SetPic4(Index).Left + 120
+LoadArtShowBox Val(SetPic4(Index).Tag)
+ShowBox.Visible = True
+End Sub
+Private Sub SetPic4_MouseExit(Index As Integer)
+ShowBox.Visible = False
+End Sub
+Private Sub SetPic3_MouseEnter(Index As Integer)
+If Val(SetPic3(Index).Tag) = 0 Then Exit Sub
+ShowBox.Top = SetBox(Index).Top + SetBox(Index).Height - 210 + IIf(Index > 1, -3250, 0)
+ShowBox.Left = SetPic3(Index).Left + 120
+LoadArtShowBox Val(SetPic3(Index).Tag)
+ShowBox.Visible = True
+End Sub
+Private Sub SetPic3_MouseExit(Index As Integer)
+ShowBox.Visible = False
+End Sub
+Private Sub SetPic2_MouseEnter(Index As Integer)
+If Val(SetPic2(Index).Tag) = 0 Then Exit Sub
+ShowBox.Top = SetBox(Index).Top + SetBox(Index).Height - 210 + IIf(Index > 1, -3250, 0)
+ShowBox.Left = SetPic2(Index).Left + 120
+LoadArtShowBox Val(SetPic2(Index).Tag)
+ShowBox.Visible = True
+End Sub
+Private Sub SetPic2_MouseExit(Index As Integer)
+ShowBox.Visible = False
+End Sub
+Private Sub SetPic1_MouseEnter(Index As Integer)
+If Val(SetPic1(Index).Tag) = 0 Then Exit Sub
+ShowBox.Top = SetBox(Index).Top + SetBox(Index).Height - 210 + IIf(Index > 1, -3250, 0)
+ShowBox.Left = SetPic1(Index).Left + 120
+LoadArtShowBox Val(SetPic1(Index).Tag)
+ShowBox.Visible = True
+End Sub
+Private Sub SetPic1_MouseExit(Index As Integer)
+ShowBox.Visible = False
+End Sub
+
+
+
+
+
+
+
+
+
+
+
+Private Sub SetSelectBox_SelectionMade(Index As Integer, ByVal SelectedItem As String, ByVal SelectedItemIndex As Long)
+If SetSelectBox(0).ListIndex = SetSelectBox(1).ListIndex And SetSelectBox(1).ListIndex <> 1 Then
+    Label1(2).Visible = True
+Else
+    Label1(2).Visible = False
+End If
+End Sub
+
+Private Sub SetSwitch_Click(Index As Integer, Value As Boolean)
+If Value Then
+    SetTipLabel(Index).Caption = "按库存圣遗物单件组合"
+    SetBox2(Index).Visible = False
+    SetTipLabel12(Index).Visible = False
+    SetTipLabel13(Index).Visible = False
+Else
+    SetTipLabel(Index).Caption = "按圣遗物详情面板数据"
+    SetBox2(Index).Visible = True
+    SetTipLabel12(Index).Visible = True
+    SetTipLabel13(Index).Visible = True
+End If
+End Sub
+
+
+Private Sub SetText1_GotFocus(Index As Integer)
+SetText1(Index).SelStart = Len(SetText1(Index).Text)
+End Sub
+Private Sub SetText1_LostFocus(Index As Integer)
+SetText1(Index).Text = CStr(Val(SetText1(Index).Text))
+End Sub
+Private Sub SetText2_GotFocus(Index As Integer)
+SetText2(Index).SelStart = Len(SetText2(Index).Text)
+End Sub
+Private Sub SetText2_LostFocus(Index As Integer)
+SetText2(Index).Text = CStr(Val(SetText2(Index).Text))
+End Sub
+Private Sub SetText3_GotFocus(Index As Integer)
+SetText3(Index).SelStart = Len(SetText3(Index).Text)
+End Sub
+Private Sub SetText3_LostFocus(Index As Integer)
+SetText3(Index).Text = CStr(Val(SetText3(Index).Text))
+End Sub
+Private Sub SetText4_GotFocus(Index As Integer)
+SetText4(Index).SelStart = Len(SetText4(Index).Text)
+End Sub
+Private Sub SetText4_LostFocus(Index As Integer)
+SetText4(Index).Text = CStr(Val(SetText4(Index).Text))
+End Sub
+Private Sub SetText5_GotFocus(Index As Integer)
+SetText5(Index).SelStart = Len(SetText5(Index).Text)
+End Sub
+Private Sub SetText5_LostFocus(Index As Integer)
+SetText5(Index).Text = CStr(Val(SetText5(Index).Text))
+End Sub
+Private Sub SetText6_GotFocus(Index As Integer)
+SetText6(Index).SelStart = Len(SetText6(Index).Text)
+End Sub
+Private Sub SetText6_LostFocus(Index As Integer)
+SetText6(Index).Text = CStr(Val(SetText6(Index).Text))
+End Sub
+Private Sub SetText7_GotFocus(Index As Integer)
+SetText7(Index).SelStart = Len(SetText7(Index).Text)
+End Sub
+Private Sub SetText7_LostFocus(Index As Integer)
+SetText7(Index).Text = CStr(Val(SetText7(Index).Text))
+End Sub
+
+Private Sub CheckState_Click(Index As Integer)
+Dim i%
+If Index < 8 Then
+    Call LoadBuff(7)
+If Index = 0 Then
+    If CheckState(0).Value = Checked Then
+        For i = 1 To 7
+            CheckState(i).Value = Unchecked
+        Next
+    End If
+    Call LoadBuff(7)
+Else
+    If CheckState(Index).Value = Checked Then CheckState(0).Value = Unchecked
+End If
+Else
+        If Index >= 8 And Index <= 10 Then Call LoadBuff(1)
+        If Index >= 11 And Index <= 13 Then Call LoadBuff(2)
+        If Index >= 14 And Index <= 17 Then Call LoadBuff(3)
+        If Index >= 18 And Index <= 19 Then Call LoadBuff(4)
+        If Index >= 20 And Index <= 24 Then Call LoadBuff(5)
+        If Index >= 25 And Index <= 28 Then Call LoadBuff(6)
+        If Index >= 29 And Index <= 31 Then Call LoadBuff(7)
+        If Index = 32 Then Call LoadBuff(8)
+        If Index = 33 Then Call LoadBuff(9)
+        
+        If Index = 17 Then Call LoadBuff(5)
+        If Index = 10 Then Call LoadBuff(5)
+        If Index = 34 Then Call LoadBuff(8): Call LoadBuff(7)
+        If Index = 35 Then Call LoadBuff(4): Call LoadBuff(7)
+        If Index = 36 Then Call LoadBuff(5)
+        If Index = 37 Then Call LoadBuff(3)
+        If Index = 38 Then Call LoadBuff(7)
+End If
+
+End Sub
+
+Sub LoadBuff(Index As Integer)
+Dim t As String, i%, j%
+Select Case Index
+    Case 0
+        For i = 1 To 9
+            LoadBuff i
+        Next
+    Case 1
+        t = Mid(Label2(2).Caption, 1, 1)
+        If t = "物" Then i = 1
+        If t = "风" Then i = 2
+        If t = "岩" Then i = 3
+        If t = "火" Then i = 4
+        If t = "水" Then i = 5
+        If t = "雷" Then i = 6
+        If t = "冰" Then i = 7
+        If t = "草" Then i = 8
+        If BuffComboBox2.Text = t Then
+            j = Val(Enemy(BuffComboBox1.ListIndex + 1, 10))
+        Else
+            j = Val(Enemy(BuffComboBox1.ListIndex + 1, i + 1))
+        End If
+        
+        
+        Label2(3).Tag = j - Val(Text1(0).Text) - GBC(8, 40) - GBC(9, 20) - GBC(10, 20)
+        Label2(3).Caption = "敌人当前抗性（" + t + "）：" + CStr(Round(Label2(3).Tag, 2)) + "%"
+        If j = 10000 Then Label2(3).Caption = "敌人当前抗性（" + t + "）：免疫"
+    Case 2
+        Label2(5).Tag = Val(Text1(1).Text) + GBC(11, 23) + GBC(12, 15) + GBC(13, 15)
+        Label2(5).Caption = "敌人被减防御：" + CStr(Round(Label2(5).Tag, 2)) + "%"
+    Case 3
+        Label2(8).Tag = Val(Text1(2).Text) + GBC(14, 20) + GBC(15, 20) + GBC(16, 0) + GBC(17, 0) + GBC(37, 25)
+        Label2(8).Caption = "攻击力百分比加成：" + CStr(Round(Label2(8).Tag, 2)) + "%"
+    Case 4
+        Label2(10).Tag = Val(Text1(3).Text) + GBC(18, 0) + GBC(19, 0) + GBC(35, 372)
+        Label2(10).Caption = "攻击力数字加成：" + CStr(Round(Label2(10).Tag, 2))
+    Case 5
+        Label2(12).Tag = Val(Text1(4).Text) + GBC(20, 0) + GBC(21, 35) + GBC(22, 0) + GBC(23, 0) + GBC(24, 20) + GBC(36, 25)
+        If CheckState(10).Value = Checked Then Label2(12).Tag = Label2(12).Tag + 15
+        t = ListBox1.ItemKey(ListBox1.ListIndex)
+        i = Val(Text1(10).Text)
+            If (InStr(2, t, "a") > 0 Or InStr(2, t, "d") > 0 Or InStr(2, t, "c") > 0) And CheckState(17).Value = Checked Then
+                Label2(12).Tag = Label2(12).Tag + 16 + (i - 1) * 4
+            End If
+        Label2(12).Caption = "伤害加成：" + CStr(Round(Label2(12).Tag, 2)) + "%"
+    Case 6
+        Label2(14).Tag = Val(Text1(5).Text) + GBC(25, 20) + GBC(26, 200) + GBC(27, 200) + GBC(28, 125)
+        Label2(14).Caption = "元素精通加成：" + CStr(Round(Label2(14).Tag, 2))
+    Case 7
+        Label2(16).Tag = Val(Text1(6).Text) + GBC(29, 12) + GBC(30, 0) + GBC(31, 12) + GBC(38, 15) + GBC(34, 20) + GBC(35, 12)
+        Label2(16).Caption = "暴击率加成：" + CStr(Round(Label2(16).Tag, 2)) + "%"
+    Case 8
+        Label2(18).Tag = Val(Text1(7).Text) + GBC(32, 60) + GBC(34, 20)
+        Label2(18).Caption = "暴击伤害加成：" + CStr(Round(Label2(18).Tag, 2)) + "%"
+    Case 9
+        Label2(20).Tag = Val(Text1(8).Text) + GBC(33, 60)
+        Label2(20).Caption = "元素充能效率加成：" + CStr(Round(Label2(20).Tag, 2)) + "%"
+End Select
+End Sub
+Private Function GBC(Index As Integer, v As Integer) As Single
+Dim i As Integer, t As String
+GBC = 0
+If CheckState(Index).Value = Unchecked Then Exit Function
+
+
+GBC = IIf(CheckState(Index).Value = Checked, v, 0)
+If Index = 8 Then
+    If Mid(Label2(2).Caption, 1, 1) <> "岩" And Mid(Label2(2).Caption, 1, 1) <> "风" And Mid(Label2(2).Caption, 1, 1) <> "物" Then
+        GBC = GBC
+    Else
+        GBC = 0
+    End If
+End If
+
+
+If Index = 10 Then
+    If Mid(Label2(2).Caption, 1, 1) <> "岩" Then GBC = 0
+End If
+
+If Index = 16 Then '讨龙
+    i = Val(Text1(9).Text)
+    If i < 0 Then i = 1: Text1(9).Text = "1"
+    If i > 5 Then i = 5: Text1(9).Text = "5"
+    GBC = 24 + (i - 1) * 6
+End If
+
+If Index = 17 Then '苍古
+    i = Val(Text1(10).Text)
+    If i < 0 Then i = 1: Text1(10).Text = "1"
+    If i > 5 Then i = 5: Text1(10).Text = "5"
+    GBC = 20 + (i - 1) * 5
+End If
+
+If Index = 18 Then '班尼特
+    GBC = 1
+End If
+
+If Index = 19 Then '九条
+    GBC = 1
+End If
+
+
+If Index = 20 Then '万叶加伤
+    i = Val(Text1(10).Text)
+    If i < 0 Then i = 0: Text1(10).Text = "0"
+    If CheckState(26).Value = Checked Then i = i + 200
+    GBC = Round(i * 0.04, 2)
+    If Mid(Label2(2).Caption, 1, 1) = "风" Or Mid(Label2(2).Caption, 1, 1) = "岩" Or Mid(Label2(2).Caption, 1, 1) = "物" Then GBC = 0
+End If
+
+If Index = 21 Then
+    If Mid(Label2(2).Caption, 1, 1) = "风" Or Mid(Label2(2).Caption, 1, 1) = "岩" Or Mid(Label2(2).Caption, 1, 1) = "物" Then GBC = 0
+End If
+
+If Index = 22 Then '莫娜Q
+    i = Val(Text1(12).Text)
+    If i < 0 Then i = 0: Text1(12).Text = "0"
+    If i > 10 Then i = 10
+    GBC = 40 + 2 * i
+End If
+
+
+If Index = 23 Then '将军E
+    i = Val(Text1(13).Text)
+    If i < 0 Then i = 0: Text1(13).Text = "0"
+    If i > 9 Then i = 9
+    GBC = CharList(1, 3) * (0.21 + 0.01 * i) / 100
+        t = ListBox1.ItemKey(ListBox1.ListIndex)
+            If InStr(2, t, "q") <= 0 Then GBC = 0
+End If
+
+
+If Index = 24 Then
+    If Mid(Label2(2).Caption, 1, 1) <> "冰" Then GBC = 0
+End If
+
+If Index = 25 Then '砂糖精通
+    i = Val(Text1(14).Text)
+    If i < 0 Then i = 0: Text1(14).Text = "0"
+    GBC = Round(i * 0.2) + 50
+End If
+
+
+If Index = 30 Then '罗莎莉亚暴击
+    i = Val(Text1(15).Text)
+    If i < 0 Then i = 0: Text1(15).Text = "0"
+    If i > 100 Then i = 100
+    GBC = Round(i * 0.15, 2)
+End If
+
+If Index = 32 Then
+    If Mid(Label2(2).Caption, 1, 1) <> "雷" Then GBC = 0
+End If
+
+If Index = 33 Then '雷主充能
+    i = Val(Text1(16).Text)
+    If i < 0 Then i = 0: Text1(16).Text = "0"
+    GBC = 20 + i * 0.1
+End If
+
+If Index = 36 Then
+    If Mid(Label2(2).Caption, 1, 1) = "物" Then GBC = 0
+End If
+
+If Index = 38 Then
+  If CheckState(3).Value = Unchecked And CheckState(7).Value = Unchecked Then GBC = 0
+End If
+
+End Function
+
+
+
+
+
+
+Private Sub SetTipLabel12_Click(Index As Integer)
+Container3.Top = SetBox(Index).Top + 600
+Container3.Left = SetTipLabel12(Index).Left - 1000
+Container3.Visible = True
+CommandButton3.Tag = Index
+End Sub
+
+
+Private Sub Text1_Change(Index As Integer)
+If Index < 9 Then Call LoadBuff(Index + 1)
+If Index = 9 Then Call LoadBuff(3)
+If Index = 10 Then Call LoadBuff(3)
+
+
+End Sub
+
+Private Sub Timer1_Timer()
+On Error Resume Next
+Dim i As Integer
+                i = Val(Timer1.Tag)
+                LevelBox(i).ListIndex = BoxTemp(i)
+                If LevelBox(i).ListIndex = BoxTemp(i) Then Timer1.Tag = CStr(i + 1)
+                
+                If Timer1.Tag = "3" Then
+                                Call ListBox1_Selected(Val(BoxTemp(3)))  '9、选择技能
+                                ListBox1.ListIndex = BoxTemp(3)
+                                Timer1.Enabled = False
+                End If
+                
+                
+End Sub
+
+Private Sub WeaponBox_SelectionMade(ByVal SelectedItem As String, ByVal SelectedItemIndex As Long)
+SaveSet0
+End Sub
+
+Private Sub zTimCtn1_Timer() '动态效果 线程一（利用效率更高的 Timer 控件，非系统内置 Timer，支持倒计时功能）
+On Error Resume Next
+    Dim ml As Single, mt As Single
+    If mObj1.Left < mToLeft1 Then
+        ml = mToLeft1 - mObj1.Left
+        ml = ml / 9
+        mObj1.Left = mObj1.Left + ml
+    ElseIf mObj1.Left > mToLeft1 Then
+        ml = mObj1.Left - mToLeft1
+        ml = ml / 9
+        mObj1.Left = mObj1.Left - ml
+    End If
+    
+    If mObj1.Top < mToTop1 Then
+        mt = mToTop1 - mObj1.Top
+        mt = mt / 9
+        mObj1.Top = mObj1.Top + mt
+    ElseIf mObj1.Top > mToTop1 Then
+        mt = mObj1.Top - mToTop1
+        mt = mt / 9
+        mObj1.Top = mObj1.Top - mt
+    End If
+    
+    If Round(mObj1.Left) = Round(mToLeft1) And Round(mObj1.Top) = Round(mToTop1) Then
+        zTimCtn1.Enabled = False
+    End If
+End Sub
+
+
+
+Private Sub LoadControl() '写成方法的形式方便调用，且易于维护
+On Error Resume Next
+Dim i%, j%, sumi%, sumj%
+    FrmMain.Width = 10995
+    FrmMain.Height = 7920
+    DMGTypetext(1) = "火"
+    DMGTypetext(2) = "水"
+    DMGTypetext(3) = "草"
+    DMGTypetext(4) = "雷"
+    DMGTypetext(5) = "风"
+    DMGTypetext(6) = "冰"
+    DMGTypetext(7) = "岩"
+    DMGTypetext(8) = "物理"
+        ArtTypetext(1) = "骑士"
+        ArtTypetext(2) = "少女"
+        ArtTypetext(3) = "苍白"
+        ArtTypetext(4) = "魔女"
+        ArtTypetext(5) = "风套"
+        ArtTypetext(6) = "渡火"
+        ArtTypetext(7) = "乐团"
+        ArtTypetext(8) = "逆飞"
+        ArtTypetext(9) = "平雷"
+        ArtTypetext(10) = "千岩"
+        ArtTypetext(11) = "冰套"
+        ArtTypetext(12) = "水套"
+        ArtTypetext(13) = "绝缘"
+        ArtTypetext(14) = "角斗"
+        ArtTypetext(15) = "追忆"
+        ArtTypetext(16) = "如雷"
+        ArtTypetext(17) = "岩套"
+        ArtTypetext(18) = "宗室"
+    
+    
+    
+    
+    ContainerBox.Left = 0
+    ContainerBox.Top = 0
+    
+    i = 1
+    Do While Dir(App.Path + "\Res\Public\S_" + CStr(i) + ".jpg") <> ""
+        Load ImageTemp(i)
+        ImageTemp(i).Picture = LoadPicture(App.Path + "\Res\Public\S_" + CStr(i) + ".jpg")
+        i = i + 1
+    Loop
+    
+    'Call CommandButton1_Click
+    
+    For i = 0 To 39
+        CheckState(i).Font.SIZE = CheckState(i).Font.SIZE - 1
+        CheckState(i).BackColor = 16244694
+        Text1(i).BackColor = 16244694
+    Next
+    ScrollBar2.Max = ContainerBox.Height - Container1(2).Height
+    ContainerBox.Top = 0
+    Container1(0).BackColor = vbWhite
+    
+    
+    
+    
+    
+    'AlphaImage 图片控件，功能强大，主要用作窗体UI素材堆叠（直接显示PNG等格式图片），理论上可以实现任何界面效果，【右键属性菜单更换控件图片】
+    pngCloseBG.Opacity = 0
+    pngMinimizeBG.Opacity = 0
+    
+
+
+    For i = 2 To UBound(Enemy)
+        BuffComboBox1.AddItem Enemy(i, 1)
+        BuffComboBox2.AddItem Enemy(i, 1)
+    Next
+    BuffComboBox1.ListIndex = 1
+    BuffComboBox1_SelectionMade "", 1
+    
+    
+    WeaponBox.AddItem 1
+    For i = 20 To 90 Step 10
+        If i <> 30 Then WeaponBox.AddItem i
+    Next
+    WeaponBox.ListIndex = 8
+    For i = 0 To 1
+        SetSelectBox(i).AddItem "无"
+            For j = 1 To UBound(ArtTypetext)
+                SetSelectBox(i).AddItem ArtTypetext(j) + "2"
+            Next
+        SetSelectBox(i).ListIndex = 1
+    Next
+        Label1(2).Visible = False
+    
+    
+    For i = 0 To 2
+        For j = 1 To 15
+            LevelBox(i).AddItem j
+        Next
+        LevelBox(i).ListIndex = 10
+    Next
+    
+
+    CBoxFlag = 5
+    RBoxFlag = 4
+    LevelBar.Line (0, 0)-(192, LevelBar.Height), , BF
+    lblTab(4).Tag = 96
+
+
+    i = 0
+    j = 0
+    
+        For i = 1 To 90
+            j = j + 1
+            LevelText(j) = CStr(i) + "级"
+                If i Mod 10 = 0 And i <> 10 And i <> 30 Then
+                    j = j + 1
+                    LevelText(j) = CStr(i) + "级已突破"
+                End If
+        Next
+ 
+
+End Sub
+
+
+Sub LoadChar(Index As Integer)
+On Error Resume Next
+Dim i%, j%, sumi%, sumj%
+Dim t As String, temp() As String
+
+Set xlsheet = xlbook.Sheets(Index * 2 + 1)
+sumi = 25
+sumj = 19
+AlphaImageChar.LoadImage_FromFile App.Path + "\Res\Public\C" + CStr(Index) + ".png"
+AlphaImageChar.Tag = Index
+lblTab(10).Caption = CharList(Index, 1)
+
+ReDim CurrCharSkill(1 To sumi, 1 To sumj) '加载技能（内存）
+    For i = 1 To sumi
+        For j = 1 To sumj
+            CurrCharSkill(i, j) = xlsheet.Cells(i, j).Value
+        Next
+        
+    Next
+    
+    Call LoadSkill '加载倍率
+    
+    
+    If CharList(Index, 5) <> "" Then '加载提示
+        lblTab(11).Caption = "*" + CharList(Index, 5)
+    Else
+        lblTab(11).Caption = ""
+    End If
+redo:
+    If Dir(App.Path + "\Data\User\C" + CStr(Index), vbDirectory) <> "" Then '存在文件夹
+                Open App.Path + "\Data\User\C" + CStr(Index) + "\set0" For Binary As #1
+                     t = StrConv(InputB(LOF(1), 1), vbUnicode)
+                Close #1
+                temp = Split(t, vbCrLf)
+                lblTab(4).Tag = Val(temp(0))  '1、等级
+                lblTab(4).Caption = "角色等级：" + LevelText(Val(temp(0)))
+                LevelBar.Cls
+                LevelBar.Line (0, 0)-(Val(temp(0)) * 2, LevelBar.Height), , BF
+                CBoxFlag = Val(temp(1)) '2、命座
+                LoadWeapon (Val(temp(2))) '3、武器
+                WeaponBox.ListIndex = Val(temp(3)) '4、武器等级
+                RBoxFlag = Val(temp(4)) '5、精炼
+                For i = 0 To 5
+                   If i <= CBoxFlag Then
+                       CBox(i).Value = Checked
+                   Else
+                       CBox(i).Value = Unchecked
+                   End If
+                Next
+    
+    
+                For i = 0 To 4
+                   If i <= RBoxFlag Then
+                       RBox(i).Value = Checked
+                   Else
+                       RBox(i).Value = Unchecked
+                   End If
+                Next
+                
+                BoxTemp(0) = Val(temp(5))
+                BoxTemp(1) = Val(temp(6))
+                BoxTemp(2) = Val(temp(7))
+                BoxTemp(3) = Val(temp(8))
+                Timer1.Tag = "0"
+                Timer1.Enabled = True
+                
+
+                
+                
+                For i = 1 To 10
+                    Unload
+                Next
+                
+                i = 1
+                Do While Dir(App.Path + "\Data\User\C" + CStr(Index) + "\set" + CStr(i)) <> ""
+                    Open App.Path + "\Data\User\C" + CStr(Index) + "\set" + CStr(i) For Binary As #1
+                         t = StrConv(InputB(LOF(1), 1), vbUnicode)
+                    Close #1
+                    temp = Split(t, vbCrLf)
+                    Call CommandButton1_Click
+                    i = i + 1
+                    
+                Loop
+    Else '不存在文件夹
+        MkDir (App.Path + "\Data\User\C" + CStr(Index))
+        If CharList(Index, 2) = "1" Then t = "1"
+        If CharList(Index, 2) = "2" Then t = "49"
+        If CharList(Index, 2) = "3" Then t = "35"
+        If CharList(Index, 2) = "4" Then t = "22"
+        If CharList(Index, 2) = "5" Then t = "17"
+
+            Open App.Path + "\Data\User\C" + CStr(Index) + "\set0" For Output As #1
+                Print #1, "96" + vbCrLf + "5" + vbCrLf + t + vbCrLf + "8" + vbCrLf + "4" + vbCrLf + "10" + vbCrLf + "10" + vbCrLf + "10" + vbCrLf + "1";
+            Close #1
+            
+            Open App.Path + "\Data\User\C" + CStr(Index) + "\set1" For Output As #1
+                Print #1, "1" + vbCrLf + "0" + vbCrLf + "0" + vbCrLf + "0" + vbCrLf + "0" + vbCrLf + "0" + vbCrLf + "1" + vbCrLf + "1" + vbCrLf + "1" + vbCrLf + "0" + vbCrLf + "0" + vbCrLf + "0" + vbCrLf + "0" + vbCrLf + "0" + vbCrLf + "0" + vbCrLf + "0" + vbCrLf + "";
+            Close #1
+        GoTo redo
+    End If
+    
+    test.附魔 = ""
+
+    If CharList(Index, 1) = "魈" Then test.附魔 = "风"
+    If CharList(Index, 1) = "胡桃" Then test.附魔 = "火"
+    If CharList(Index, 1) = "迪卢克" Then test.附魔 = "火"
+    If CharList(Index, 1) = "神里绫华" Then test.附魔 = "冰"
+
+
+
+End Sub
+
+
+Private Sub LoadSkill() '显示倍率
+Dim i%, j%, tip As String, M As String, v As Variant
+    ListBox1.Clear
+    For i = 1 To 25
+        tip = ""
+        If CurrCharSkill(i, 1) <> "" Then
+
+            
+            If CurrCharSkill(i, 1) = "c1e2" Then tip = " 防御力"
+            If CurrCharSkill(i, 1) = "c8s1" Then '北斗护盾后门
+                v = Array(1386, 1525, 1675, 1837, 2010, 2195, 2392, 2600, 2819, 3050, 3293, 3547, 3813, 4090, 4379)
+                tip = "生命值 + " + CStr(v(LevelBox(1).ListIndex - 1))
+            End If
+            
+            
+            M = CStr(GetBonus(CurrCharSkill(i, 1))) + "%" + tip
+            
+            
+            ListBox1.AddItem CurrCharSkill(i, 3), M, CurrCharSkill(i, 1), ImageTemp(Val(CurrCharSkill(i, 2)))
+        End If
+    Next
+    If ListBox1.ListIndex = 0 Then ListBox1.ListIndex = 1
+End Sub
+
+ Sub LoadWeapon(Index As Integer)
+    AlphaImageWeap.LoadImage_FromFile App.Path + "\Res\Public\W_" + CStr(Index) + ".png"
+    AlphaImageWeap.Tag = Index
+    lblTab(9).Caption = WeaponList(Index, 1)
+End Sub
+
+
+Sub SaveSet0()
+            Open App.Path + "\Data\User\C" + AlphaImageChar.Tag + "\set0" For Output As #1
+                Print #1, lblTab(4).Tag + vbCrLf + CStr(CBoxFlag) + vbCrLf + AlphaImageWeap.Tag + vbCrLf + CStr(WeaponBox.ListIndex) + vbCrLf + CStr(RBoxFlag) + vbCrLf + CStr(LevelBox(0).ListIndex) + vbCrLf + CStr(LevelBox(1).ListIndex) + vbCrLf + CStr(LevelBox(2).ListIndex) + vbCrLf + CStr(ListBox1.ListIndex);
+            Close #1
+End Sub
+
+
+
+
+
+
+
+
+
+
+
+Private Sub pngMain_MouseDown(Button As Integer, Shift As Integer, x As Single, y As Single) '需要在父级控件 MouseDown 方法中使用
+    MoveForm Me '用于移动无边框窗体
+End Sub
+Private Sub lblLogo_MouseDown(Button As Integer, Shift As Integer, x As Single, y As Single) '同上
+     MoveForm Me '用于移动无边框窗体
+End Sub
+
+Private Sub pngMenu_Click(ByVal Button As Integer) '显示 CMenu 菜单
+    If Button = 1 Then
+        C_Menu.Show '左键显示
+    Else
+        C_Sort.Show '右键显示
+    End If
+End Sub
+
+Private Sub pngMinimize_Click(ByVal Button As Integer)
+    Me.WindowState = vbMinimized '窗体最小化
+End Sub
+
+Private Sub pngMinimize_MouseEnter() '这个 Enter 是控件内部方法，与 Move 效果不同（Enter 效率更高）
+    pngMinimizeBG.FadeInOut 100, 8
+End Sub
+
+Private Sub pngMinimize_MouseExit() 'Exit 同上，为鼠标移出控件范围时触发
+    pngMinimizeBG.FadeInOut 0, 8
+End Sub
+
+Private Sub pngClose_Click(ByVal Button As Integer) 'Tray 托盘控件，在程序关闭时先判断是否为托盘模式
+    '读取配置 [ 最小化到托盘 ]
+    If False Then '这里可以设计成读取 ini 配置文件（modIni 模块，使用方法请看下方注释代码 ↓↓）[ 可以写一个单独的模块，在程序启动时读取配置，再在全局变量中自己定义个参数赋上对应值 ]
+        Me.Hide                       '例如读取 ini 后设 FrmMain.SET_TRAY = 读取到的属性，然后在主窗体关闭时取这个全局变量 SET_TRAY 判断一下，如果是 XX 怎么处理，如果不是怎么处理。
+        Tray1.Show '显示托盘
+        mnuShow.Caption = "显示界面"
+        If MODEL_TRAY Then '托盘气泡只显示一次
+            MODEL_TRAY = False
+            Tray1.ShowBubble "温馨提示", "BSkin Demo 正在后台运行", NIIF_GUID 'NIIF_NONE 无图标，NIIF_INFO 信息图标，NIIF_WARNING 警告图标，NIIF_ERROR 错误图标，NIIF_GUID 托盘的图标
+        End If
+    Else
+        Unload Me '关闭窗体，如果关闭后进程不能结束，请使用 End
+    End If
+End Sub
+
+'ini 配置文件设置代码（判断选项，然后储存对应的参数）
+'If optSetExitEnd.Value = True Then WriteIniParam APP_DATA & INI_SETTING, "Common", "AppExit", "End"
+'If optSetExitMin.Value = True Then WriteIniParam APP_DATA & INI_SETTING, "Common", "AppExit", "Min"
+
+'ini 配置文件读取代码（读取配置参数，然后进行对应设置）
+'optSetExitEnd.Value = IIf(GetIniParam(APP_DATA & INI_SETTING, "Common", "AppExit") = "End", True, False)
+'optSetExitMin.Value = IIf(GetIniParam(APP_DATA & INI_SETTING, "Common", "AppExit") = "Min", True, False)
+
+'ini 配置文件自动生成配置内容
+'[Common]
+'AppExit=End
+
+
+'pngCloseBG.FadeInOut 100, 8 第一个参数是 Opacity 即透明度 0-100 值越大透明度越低，第二个参数是速度 1-20 值越大变化速度越快
+
+Private Sub pngClose_MouseEnter() '鼠标移入
+    pngCloseBG.FadeInOut 100, 8 '图像渐变
+End Sub
+
+Private Sub pngClose_MouseExit() '鼠标移出
+    pngCloseBG.FadeInOut 0, 8 '图像渐变
+End Sub
+
+Private Sub pngTab_Click(Index As Integer, ByVal Button As Integer) '菜单功能选择特效
+    zMove1 AlphaImage1, pngTab(Index).Left - 200, AlphaImage1.Top, True '匀减速移动，利用效率更高的 Timer 控件
+    
+    Dim i As String, j As Integer
+    
+    For j = 0 To Container1.Count - 1 '隐藏全部功能容器
+        With Container1(j)
+            .Visible = False
+            .BackColor = vbWhite
+            .Left = Container1(0).Left '每个容器都和第一个容器对齐
+            .Top = Container1(0).Top '这样方便其他页面的调整
+        End With
+    Next
+    
+    If Index <> 1 Then Unload FrmAbout
+    If Index <> 0 Then Unload FrmChar
+    
+    
+    Select Case Index '显示所选的功能容器（有几个页面就 Case 几个，会根据索引来显示对应的页面）
+        Case 0
+            Container1(Index).Visible = True 'Index 为对应控件的索引，基本知识
+
+        Case 1
+            Container1(Index).Visible = True '每个容器内都有自己的代码逻辑，所以 Case 对应显示容器，还有触发里面的方法
+
+            
+        Case 2
+            Container1(Index).Visible = True
+
+            'Call LoadListView
+        Case 3
+            Container1(Index).Visible = True
+            If ReloadTip Then
+            ClearSelectBuff
+            ReloadTip = False
+            
+            i = CharList(Val(AlphaImageChar.Tag), 1)
+                Select Case i
+                    Case "阿贝多"
+                        If CurrSkill = "c1e2" Then AddSelectBuff i + "天赋2：刹那之花对生命值小于50%的敌人造成额外伤害", 2, 0, "目标生命值小于50%"
+                        If InStr(2, CurrSkill, "d") > 0 And CBoxFlag >= 3 Then AddSelectBuff i + "命座4：处于阳华领域中增加下落攻击伤害", 2, 0, "处于阳华领域中"
+                        
+                    Case "宵宫"
+                        If CurrSkill <> "c3a1" And CurrSkill <> "c3a2" Then AddSelectBuff i + "天赋2：焰硝庭火舞期间普通攻击命中后获得火元素伤害加成", 1, 10, " 层效果"
+                        If CBoxFlag >= 0 Then AddSelectBuff i + "命座1：击败琉金火光影响下的敌人后获得攻击力加成", 2, , "击败琉金火光影响下的敌人后"
+                        If CBoxFlag >= 1 Then AddSelectBuff i + "命座2：火元素伤害造成暴击后获得火元素伤害加成", 2, , "火元素伤害造成暴击后"
+                    Case "安柏"
+                        AddSelectBuff i + "天赋2：瞄准射击命中弱点后获得攻击力加成", 2, 0, "瞄准射击命中弱点后"
+                    Case "芭芭拉"
+                        AddSelectBuff i + "命座2：处于E技能状态时获得水元素伤害加成", 2, 0, "处于歌声之环中"
+                    Case "北斗"
+                        If InStr(2, CurrSkill, "a") > 0 Or InStr(2, CurrSkill, "c") > 0 Then AddSelectBuff i + "天赋2：释放最大伤害E后获得普通攻击/重击伤害加成", 2, 0, "施放最大伤害E后"
+                    Case "胡桃"
+                            AddSelectBuff i + "：是否开启元素战技（进入彼岸蝶舞状态）", 2, 0, "施放元素战技后"
+                            BuffCheck(SelectCount).Value = Checked
+                            AddSelectBuff i + "天赋3：血量低于50%时获得火元素伤害加成", 2, 0, "生命值低于50%"
+                    Case "魈"
+                        AddSelectBuff i + "：处于靖妖傩舞第几秒", 1, 15, " 傩舞秒数(若未开启，则为0)"
+                        SelectBuffBar(SelectCount).Cls
+                        SelectBuffBar(SelectCount).Tag = "1"
+                        Call SelectBuffBar_MouseMove(SelectCount, 1, 0, 15, 1)
+                        SelectBuffBar(SelectCount).Tag = "0"
+                    Case "迪卢克"
+                        AddSelectBuff i + "：是否开启元素爆发（进入火附魔状态）", 2, 0, "施放元素爆发后"
+                        BuffCheck(SelectCount).Value = Checked
+                        If CBoxFlag >= 0 Then AddSelectBuff i + "命座1：对生命值高于50%的敌人造成额外伤害", 2, 0, "目标生命值大于50%"
+                        If CBoxFlag >= 1 Then AddSelectBuff i + "命座2：受击后提高攻击力", 1, 3, " 层效果%"
+                        If CBoxFlag >= 3 And InStr(2, CurrSkill, "e") > 0 Then AddSelectBuff i + "命座4：有节奏地施放元素战技时可提高伤害", 2, , "触发命座4"
+                        If CBoxFlag >= 5 And InStr(2, CurrSkill, "a") > 0 Then AddSelectBuff i + "命座6：施放元素战技后提高普通攻击伤害", 2, , "施放元素战技后"
+                        
+                        
+                    Case "神里绫华"
+                        AddSelectBuff i + "：是否使用替代冲刺（进入冰附魔状态）命中敌人", 2, 0, "使用替代冲刺命中敌人"
+                        BuffCheck(SelectCount).Value = Checked
+                        If CBoxFlag = 5 And InStr(2, CurrSkill, "c") > 0 Then AddSelectBuff i + "命座6：本次重击是否触发薄冰舞踏", 2, 0, "薄冰舞踏触发"
+                        If InStr(2, CurrSkill, "a") > 0 Or InStr(2, CurrSkill, "c") > 0 Then AddSelectBuff i + "天赋2：使用元素战技后提高普通攻击/重击伤害", 2, 0, "施放元素战技后"
+                        
+                End Select
+                
+            
+            
+            
+            i = WeaponList(Val(AlphaImageWeap.Tag), 1)
+                Select Case i
+                    Case "和璞鸢"
+                        AddSelectBuff "和璞鸢：命中敌人后提高自身攻击力", 1, 7, "层效果"
+                    Case "决斗之枪"
+                        AddSelectBuff "决斗之枪：身边有敌人时获得增益", 1, 2, "身边敌人数量"
+                    Case "匣里日月"
+                        If InStr(2, CurrSkill, "q") > 0 Or InStr(2, CurrSkill, "e") > 0 Then AddSelectBuff "匣里日月：特效增伤", 2, , "普通攻击命中敌人后"
+                        If InStr(2, CurrSkill, "a") > 0 Then AddSelectBuff "匣里日月：特效增伤", 2, , "元素战技/元素爆发命中敌人后"
+                    Case "千岩古剑"
+                        AddSelectBuff "千岩古剑：队伍中有璃月成员时获得增益", 1, 4, "队伍璃月成员数量"
+                    Case "千岩长枪"
+                        AddSelectBuff "千岩长枪：队伍中有璃月成员时获得增益", 1, 4, "队伍璃月成员数量"
+                    Case "翡玉法球"
+                        AddSelectBuff "翡玉法球：触发水相关元素反应后增加攻击力加成", 2, , "触发水相关反应"
+                    Case "黑岩绯玉"
+                        AddSelectBuff "黑岩绯玉：击败敌人后获得攻击力加成", 1, 3, "击败敌人数量"
+                    Case "万国诸海图谱"
+                        AddSelectBuff "万国诸海图谱：触发元素反应后获得元素伤害加成", 1, 2, "触发元素反应"
+                    Case "宗室秘法录"
+                        AddSelectBuff "宗室秘法录：造成伤害后，堆叠暴击率", 1, 5, "堆叠层数"
+                    Case "宗室大剑"
+                        AddSelectBuff "宗室大剑：造成伤害后，堆叠暴击率", 1, 5, "堆叠层数"
+                    Case "宗室猎枪"
+                        AddSelectBuff "宗室猎枪：造成伤害后，堆叠暴击率", 1, 5, "堆叠层数"
+                    Case "宗室长剑"
+                        AddSelectBuff "宗室长剑：造成伤害后，堆叠暴击率", 1, 5, "堆叠层数"
+                    Case "宗室长弓"
+                        AddSelectBuff "宗室长弓：造成伤害后，堆叠暴击率", 1, 5, "堆叠层数"
+                    Case "暗巷的酒与诗"
+                        AddSelectBuff "暗巷的酒与诗：冲刺后增加攻击力", 2, 0, "冲刺/替代冲刺后"
+                    Case "嘟嘟可故事集"
+                        If InStr(2, CurrSkill, "c") > 0 Then
+                            AddSelectBuff "嘟嘟可故事集：普通攻击/重击命中后获得增益", 2, 2, "重击命中敌人后", "普通攻击命中敌人后"
+                        Else
+                            AddSelectBuff "嘟嘟可故事集：重击命中后获得攻击力加成", 2, , "重击命中敌人后"
+                        End If
+                    Case "四风原典"
+                        AddSelectBuff "四风原典：持续在场时获得元素伤害加成", 1, 4, "层效果"
+                    Case "尘世之锁"
+                        AddSelectBuff "尘世之锁：命中敌人后获得攻击力加成", 1, 5, "层效果"
+                    Case "铁影阔剑"
+                        If InStr(2, CurrSkill, "c") > 0 Then AddSelectBuff "铁影阔剑：生命值低于70%时获得重击伤害加成", 2, , "生命值低于70%"
+                    Case "飞天大御剑"""
+                        AddSelectBuff "飞天大御剑：普通攻击或重击命中敌人后获得攻击力加成", 1, 4, "层效果"
+                    Case "黑岩斩刀"
+                        AddSelectBuff "黑岩斩刀：击败敌人后获得攻击力加成", 1, 3, "击败敌人数量"
+                    Case "黑岩刺枪"
+                        AddSelectBuff "黑岩刺枪：击败敌人后获得攻击力加成", 1, 3, "击败敌人数量"
+                    Case "黑岩战弓"
+                        AddSelectBuff "黑岩战弓：击败敌人后获得攻击力加成", 1, 3, "击败敌人数量"
+                    Case "黑岩长剑"
+                        AddSelectBuff "黑岩长剑：击败敌人后获得攻击力加成", 1, 3, "击败敌人数量"
+                   Case "螭骨剑"
+                        AddSelectBuff "螭骨剑：持续在场时获得伤害加成 ", 1, 5, "层效果"
+                   Case "白影剑"
+                        AddSelectBuff "白影剑：命中敌人后获得攻击力和防御力加成 ", 1, 4, "层效果"
+                   Case "狼的末路"
+                        AddSelectBuff "狼的末路：命中生命值小于30%的敌人后获得攻击力加成 ", 2, , "命中生命值小于30%的敌人后"
+                   
+                   Case "无工之剑"
+                        AddSelectBuff "无工之剑：命中敌人后获得攻击力加成 ", 1, 5, "层效果"
+                   
+                   Case "松籁响起之时"
+                        AddSelectBuff "松籁响起之时：触发特效后获得攻击力和攻速加成 ", 2, , "揭旗之歌触发"
+                   Case "神射手之誓"
+                        AddSelectBuff "神射手之誓：提高针对要害造成的伤害", 2, , "针对要害"
+                   Case "弹弓"
+                        If InStr(2, CurrSkill, "a") > 0 Or InStr(2, CurrSkill, "c") > 0 Then AddSelectBuff i + "：快速命中敌人时提高伤害，否则伤害降低", 2, , "0.3秒内命中"
+                   Case "暗巷猎手"
+                        AddSelectBuff i + "：持续位于后台时获得伤害加成", 1, 10, "层效果"
+                   Case "钢轮弓"
+                        AddSelectBuff i + "：普通攻击/重击命中敌人后获得攻击力和攻速加成", 1, 4, "层效果"
+                   Case "试作澹月"
+                        AddSelectBuff i + "：重击命中要害后获得攻击力和移速加成", 2, , "命中要害后"
+                  Case "风花之颂"
+                    If InStr(2, CurrSkill, "e") = 0 Then AddSelectBuff i + "：施放元素战技后获得攻击力加成", 2, , "施放元素战技后"
+                  Case "幽夜华尔兹"
+                      If InStr(2, CurrSkill, "e") > 0 Then AddSelectBuff i + "：普通攻击命中后获得元素战技伤害加成", 2, , "普通攻击命中后"
+                      If InStr(2, CurrSkill, "a") > 0 Then AddSelectBuff i + "：元素战技命中后获得普通攻击伤害加成", 2, , "元素战技命中后"
+                  Case "阿莫斯之弓"
+                        If InStr(2, CurrSkill, "a") > 0 Or InStr(2, CurrSkill, "c") > 0 Then AddSelectBuff i + "：箭矢随飞行时间提高伤害", 1, 5, "经过的增幅次数"
+                   Case "终末嗟叹之诗"
+                        AddSelectBuff i + "：触发特效后获得攻击力和元素精通加成 ", 2, , "别离之歌触发"
+                   Case "飞雷之弦振"
+                        AddSelectBuff i + "：获得飞雷之巴印后提高普通攻击伤害", 1, 3, "飞雷之巴印层数"
+                   Case "暗铁剑"
+                         AddSelectBuff i + "：触发雷相关元素反应后增加攻击力加成", 2, , "触发雷相关反应"
+                   Case "黎明神剑"
+                        AddSelectBuff i + "：生命值大于70%时获得暴击率加成", 2, , "生命值大于70%"
+                    
+                   Case "飞天御剑"
+                        AddSelectBuff i + "：施放元素爆发后获得攻击力和移速加成", 2, , "施放元素爆发后"
+                   Case "铁蜂刺"
+                        AddSelectBuff i + "：造成元素伤害后获得伤害加成", 1, 2, "层效果"
+                   Case "白影剑"
+                        AddSelectBuff i + "：命中敌人后获得攻击力和防御力加成 ", 1, 4, "层效果"
+                   
+                   Case "斫峰之刃"
+                        AddSelectBuff i + "：命中敌人后获得攻击力加成 ", 1, 5, "层效果"
+                        
+                   Case "苍古自由之誓"
+                        AddSelectBuff i + "：触发特效后获得攻击力和伤害加成 ", 2, , "抗争之歌触发"
+                        
+                   Case "雾切之回光"
+                        AddSelectBuff i + "：获得雾切之巴印后提高元素伤害加成", 1, 3, "雾切之巴印层数"
+                   Case "流月针"
+                        If InStr(2, CurrSkill, "a") > 0 Or InStr(2, CurrSkill, "c") > 0 Then AddSelectBuff i + "：获得元素微粒后获得普通攻击/重击伤害加成", 2, , "获得元素微粒后"
+                   Case "试作星镰"
+                        If InStr(2, CurrSkill, "a") > 0 Or InStr(2, CurrSkill, "c") > 0 Then AddSelectBuff i + "：施放元素战技后获得普通攻击/重击伤害加成", 1, 2, "施放元素战技次数"
+                   Case "贯虹之槊"
+                        AddSelectBuff i + "：命中敌人后获得攻击力加成 ", 1, 5, "层效果"
+                        
+                   Case "薙草之稻光"
+                        AddSelectBuff i + "：施放元素爆发后获得元素充能效率加成 ", 2, , "施放元素爆发后"
+                   Case "护摩之杖"
+                        For j = 1 To SelectCount
+                            If BuffCheck(j).Caption = "生命值低于50%" Then Exit Sub
+                        Next
+                        AddSelectBuff i + "：生命值低于50%时获得额外攻击力加成 ", 2, , "生命值低于50%"
+                End Select
+
+            End If
+
+            
+
+        Case 4
+            Container1(Index).Visible = True
+    End Select
+End Sub
+Private Sub ClearSelectBuff()
+On Error GoTo outs
+Dim i%
+            For i = 1 To 100
+                 FrmMain.SelectBuffBox(i).Visible = False
+            Next
+outs:
+            SelectCount = 0
+End Sub
+Private Sub AddSelectBuff(tip As String, mode As Integer, Optional Count As Integer, Optional tip2 As String, Optional tip3 As String)
+On Error GoTo outs
+    SelectCount = SelectCount + 1
+    Load SelectBuffBox(SelectCount)
+    SelectBuffBox(SelectCount).Left = SelectBuffBox(0).Left
+    SelectBuffBox(SelectCount).Top = 480 + (SelectCount - 1) * (SelectBuffBox(SelectCount).Height)
+    SelectBuffBox(SelectCount).Visible = True
+    
+    Load SelectBuffLabel(SelectCount)
+    Set SelectBuffLabel(SelectCount).Container = SelectBuffBox(SelectCount)
+    SelectBuffLabel(SelectCount).Left = SelectBuffLabel(0).Left
+    SelectBuffLabel(SelectCount).Top = SelectBuffLabel(0).Top
+    SelectBuffLabel(SelectCount).Visible = True
+    
+    
+    Load SelectBuffBar(SelectCount)
+    Set SelectBuffBar(SelectCount).Container = SelectBuffBox(SelectCount)
+    SelectBuffBar(SelectCount).Left = SelectBuffBar(0).Left
+    SelectBuffBar(SelectCount).Top = SelectBuffBar(0).Top
+    
+
+    Load BuffLabel(SelectCount)
+    Set BuffLabel(SelectCount).Container = SelectBuffBox(SelectCount)
+    BuffLabel(SelectCount).Left = BuffLabel(0).Left
+    BuffLabel(SelectCount).Top = BuffLabel(0).Top
+    
+
+    Load BuffCheck(SelectCount)
+    Set BuffCheck(SelectCount).Container = SelectBuffBox(SelectCount)
+    BuffCheck(SelectCount).Left = BuffCheck(0).Left
+    BuffCheck(SelectCount).Top = BuffCheck(0).Top
+    
+    Load BuffCheck2(SelectCount)
+    Set BuffCheck2(SelectCount).Container = SelectBuffBox(SelectCount)
+    BuffCheck2(SelectCount).Left = BuffCheck2(0).Left
+    BuffCheck2(SelectCount).Top = BuffCheck2(0).Top
+    
+outs:
+    SelectBuffBox(SelectCount).Visible = True
+    SelectBuffLabel(SelectCount).Caption = tip
+    If mode = 1 Then '托条模式
+        SelectBuffBar(SelectCount).Visible = True
+        SelectBuffBar(SelectCount).LinkTimeout = Count
+        BuffLabel(SelectCount).Visible = True
+        BuffCheck(SelectCount).Visible = False
+        BuffCheck2(SelectCount).Visible = False
+        BuffLabel(SelectCount).Caption = "0/" + CStr(Count) + " " + tip2
+        SelectBuffBar(SelectCount).Cls
+        SelectBuffLabel(SelectCount).Tag = tip2
+        
+    Else
+        SelectBuffBar(SelectCount).Visible = False
+        BuffLabel(SelectCount).Visible = False
+        BuffCheck(SelectCount).Visible = True
+        BuffCheck(SelectCount).Caption = tip2
+        If Count = 2 Then
+            BuffCheck2(SelectCount).Visible = True
+            BuffCheck2(SelectCount).Caption = tip3
+        End If
+    End If
+
+End Sub
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+'取色模块
+Private Sub PickColor1_ColorPicked() 'ColorPicked 取色控件一般可以作为公用的取色器，方便设置控件里的颜色属性
+On Error GoTo ErrExit
+    Color = PickColor1.Color
+    sRed = Color And 255
+    sGreen = (Color \ 256) And 255
+    sBlue = (Color \ 65536) And 255
+    
+    '以下代码用于演示数值计算
+    'lblSetRGB.Caption = "RGB:  " & sRed & "," & sGreen & "," & sBlue
+    'lblSetHEX.Caption = "HEX:  " & GetHex(sBlue) & GetHex(sGreen) & GetHex(sRed)
+    'lblSetPS.Caption = "PS:  #" & GetHex(sRed) & GetHex(sGreen) & GetHex(sBlue)
+    'lblSetColor.BackColor = PickColor1.Color
+    
+    Label2.BackColor = Color
+ErrExit:
+End Sub
+
+'获取HEX
+Private Function GetHex(intVal As Long) As String
+On Error GoTo ErrExit
+    Dim strHex As String
+    
+    strHex = Hex(intVal)
+    If Len(strHex) = 1 Then strHex = "0" & strHex
+    GetHex = strHex
+ErrExit:
+End Function
+
+'Tray 托盘控件，需要在主窗体上放置 Tray 控件，并在 菜单编辑器 中设置所需菜单选项
+Private Sub Tray1_PopupMenu() '托盘菜单
+    PopupMenu mnuApp '弹出设置的菜单（菜单编辑器 中修改）
+End Sub
+
+Private Sub Tray1_Click() '托盘点击（左键点击托盘直接显示窗体，右键点击会显示菜单，对应的菜单可以在 菜单编辑器 中修改，其中 “菜单” 主选项需要把 可见 勾选去掉）
+    Me.WindowState = vbNormal
+    Me.Show
+    mnuShow.Caption = "隐藏界面"
+End Sub
+
+Private Sub mnuShow_Click() '显示隐藏界面
+    If mnuShow.Caption = "隐藏界面" Then
+        Me.Hide
+        Tray1.Show
+        mnuShow.Caption = "显示界面"
+    Else
+        Me.WindowState = vbNormal
+        Me.Show
+        mnuShow.Caption = "隐藏界面"
+    End If
+End Sub
+
+Private Sub mnuSetting_Click() '程序设置
+    'FrmSetting.Show , Me '某个窗体页面
+End Sub
+
+Private Sub mnuExit_Click() '退出程序
+    Unload Me
+End Sub
+
+
+Private Sub LoadListView() 'ListView 控件，用于显示表格数据，因为使用 ListBox 制作，所以表内数据长度不能大于表头长度，不然会超长显示到其他列（此控件为精简版，只用于显示简单的表格数据）
+    Dim lItm As Long
+    Dim lCol As Long
+    Dim sRow As String
+    
+    ListView1.AddHeader 120, LeftJustify, "Column 1" '添加表头
+    ListView1.AddHeader 100, RightJustify, "Column 2" 'RightJustify 是对齐方式
+    ListView1.AddHeader 100, RightJustify, "Column 3"
+    ListView1.AddHeader 100, RightJustify, "Column 4"
+    ListView1.AddHeader 100, RightJustify, "Column 5"
+    
+    For lItm = 1 To 100
+        sRow = "Row " & lItm
+        For lCol = 2 To ListView1.HeadersCount
+            sRow = sRow & vbTab & Format$(10000 * Rnd, "#,0.00") '添加表数据
+        Next lCol
+        ListView1.AddItem sRow
+    Next lItm
+    
+    ListView1.ListIndex = 2 '选择某一行数据
+    
+    'Dim sRow As String
+    
+    'sRow = "Row changed"
+    'ListView1.List(ListView1.ListIndex) = sRow & vbTab & "-" & vbTab & "-" & vbTab & "-" & vbTab & "-" '修改某一行数据
+End Sub
+
+
+
+
+'计算数据
+Private Function VBStrFormatByteSize(ByVal LngSize As Double) As String
+On Error Resume Next
+    Dim strSize As String * 128
+    Dim strData As String
+    Dim lPos As Long
+    StrFormatByteSize LngSize, strSize, 128
+    lPos = InStr(1, strSize, Chr$(0))
+    strData = Left$(strSize, lPos - 1)
+    VBStrFormatByteSize = strData
+End Function
+
+
+'加载菜单
+Private Sub LoadCMenu()
+    Set C_Menu = New clsCMenu
+    Set C_Sort = New clsCMenu
+    Set c_Subclass = New clsCSubclass
+    
+    With C_Menu
+        .Create Me.hWnd
+        
+        .Add "系统设置", "setting"
+        .Add "新建下载", "download"
+        .Add "文件解压", "unpack"
+        .Add "检查更新", "update"
+        .Add "关于程序", "about"
+        .Add
+        .Add "退出程序", "exit"
+        '.Add
+        '.Add "这是隐藏项", "vItem"
+        '.Add "这是禁用项", "dItem"
+        
+        .Visible("vItem") = False
+        .Enabled("dItem") = False
+    End With
+    
+    With C_Sort
+        .Create Me.hWnd
+        
+        .Add "综合排序", "all"
+        .Add
+        .Add "热门下载", "download"
+        .Add "最新发布", "upload"
+        .Add "游戏编号", "number"
+        .Add
+        .Add "关闭", "close"
+    End With
+    
+    With c_Subclass
+        .ssc_Subclass Me.hWnd
+        .ssc_AddMsg Me.hWnd, WM_TASKMENU, MSG_BEFORE
+    End With
+End Sub
+
+'菜单反馈
+Private Sub C_Sort_MenuClick(ByVal MenuIndex As Long)
+    Debug.Print "你点击了第 [" & MenuIndex & "] 项，Key为 [" & C_Sort.Key(MenuIndex) & "] "
+End Sub
+
+'菜单反馈
+Private Sub C_Menu_MenuClick(ByVal MenuIndex As Long)
+    Select Case C_Menu.Key(MenuIndex)
+        Case "setting"
+            '系统设置
+        Case "download"
+            '新建下载
+        Case "unpack"
+            '文件解压
+        Case "update"
+            '检查更新
+        Case "about"
+            FrmAbout.Show , Me '关于程序
+        Case "exit"
+            Unload Me '退出程序
+    End Select
+End Sub
+
+'程序右键菜单
+Private Sub C_Subclass_SubclassProc(ByVal bBefore As Boolean, bHandled As Boolean, lReturn As Long, ByVal lhWnd As Long, ByVal uMsg As Long, ByVal wParam As Long, ByVal lParam As Long, lParamUser As Long)
+    Select Case uMsg
+        Case WM_TASKMENU
+            bHandled = True
+            lReturn = 0
+            C_Sort.Show
+    End Select
+End Sub
+

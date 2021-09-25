@@ -1,0 +1,2 @@
+WIN10注册控件：右键点击左下角的windows图标，点击 Windows Powershell（管理员）（A）
+输入：regsvr32 + 一个空格 + 程序所在文件夹的地址（如D:\天理计算器）+ \BSkin.ocx
